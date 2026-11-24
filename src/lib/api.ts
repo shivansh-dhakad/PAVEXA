@@ -70,7 +70,9 @@ export const setLiveMode = (v: boolean) => { useLive = v; };
 export const getModelMode = () => selectedModelMode;
 export const setModelMode = (m: ModelInferenceMode) => { selectedModelMode = m; };
 
-const PRIMARY_ENDPOINT = "http://localhost:8000";
+const PRIMARY_ENDPOINT =
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
+  "http://localhost:8000";
 const PROXY_ENDPOINT = "/api";
 
 // ── Mock data generator ──────────────────────────────────────────────────────
