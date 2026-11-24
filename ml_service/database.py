@@ -11,8 +11,9 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 import random
+import os
 
-DB_PATH = Path(__file__).parent / "pavexa.db"
+DB_PATH = Path(os.getenv("PAVEXA_DB_PATH", str(Path(__file__).parent / "pavexa.db")))
 
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))

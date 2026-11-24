@@ -230,6 +230,10 @@ def health():
         "ensemble_available": (_model_a is not None and _model_b is not None),
     }
 
+@app.get("/ping")
+def ping():
+    return {"status": "alive"}
+
 @app.get("/model-info", response_model=ModelBenchmark)
 def model_info():
     return ModelBenchmark(
