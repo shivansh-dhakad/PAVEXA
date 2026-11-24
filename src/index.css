@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+/* ── Design tokens ────────────────────────────────────────────────── */
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Surfaces & typography: cool concrete canvas, asphalt-toned ink */
+  --color-canvas:  #f3f5f7;
+  --color-surface: #ffffff;
+  --color-line:    #dde2e8;
+  --color-ink:     #12171e;
+  --color-body:    #364152;
+  --color-muted:   #627084;
+
+  /* Single interactive accent: road-sign blue */
+  --color-primary:       #1b4fd8;
+  --color-primary-hover: #153fae;
+  --color-primary-soft:  #e9effd;
+
+  /* Lane-marking yellow: decorative fills only, never text */
+  --color-marking: #f4c430;
+
+  /* Damage class colours: reserved for bounding-box overlays only */
+  --color-d00: #0891b2;
+  --color-d10: #d97706;
+  --color-d20: #7c3aed;
+  --color-d40: #dc2626;
+
+  /* Radius scale */
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+
+  /* Easing */
+  --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ── Spacing custom properties (supplemental) ─────────────────────── */
+:root {
+  --space-8:  8px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+  --space-64: 64px;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+body {
+  @apply bg-canvas font-sans text-body antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Component layer ──────────────────────────────────────────────── */
+@layer components {
+  .btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-sm px-4 text-sm font-medium transition-colors duration-200;
+    transition-timing-function: var(--ease-smooth);
+  }
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-hover;
+  }
+  .btn-ghost {
+    @apply border border-line bg-surface text-ink hover:bg-canvas;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+}
+
+/* ── Scanline animation ───────────────────────────────────────────── */
+@keyframes scanline {
+  0%   { top: 0%;   opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.animate-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  animation: scanline 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.08);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}
+
+/* ── Sliding motion (landing page) ────────────────────────────────── */
+
+/* Lane-marking divider: dashes travel along the road */
+@keyframes lane-slide {
+  from { background-position: 0 0; }
+  to   { background-position: -96px 0; }
+}
+
+.lane {
+  height: 6px;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-marking) 0 48px,
+    transparent 48px 96px
+  );
+  background-size: 96px 6px;
+}
+
+/* Ticker: content slides right-to-left, duplicated list loops at -50% */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 48s linear infinite;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Hero entrance: one orchestrated slide-in on load */
+@keyframes enter-left {
+  from { opacity: 0; transform: translateX(-56px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes enter-right {
+  from { opacity: 0; transform: translateX(72px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.enter-left  { animation: enter-left 800ms var(--ease-smooth) both; }
+.enter-right { animation: enter-right 900ms var(--ease-smooth) 120ms both; }
+
+/* Scroll reveal: slides in from the side when it enters the viewport */
+.reveal {
+  opacity: 0;
+  transition:
+    transform 800ms var(--ease-smooth),
+    opacity 800ms var(--ease-smooth);
+}
+.reveal-left  { transform: translateX(-48px); }
+.reveal-right { transform: translateX(48px); }
+.reveal.is-in { opacity: 1; transform: translateX(0); }
+
+/* Bars slide out from the left edge once revealed */
+.bar-fill {
+  transform: scaleX(1);
+}
+
+/* Class carousel track */
+.slide-track {
+  transition: transform 260ms var(--ease-smooth);
+}
+
+/* Arrow nudges right on row hover */
+.row-arrow {
+  transition: transform 250ms var(--ease-smooth);
+}
+.row-link:hover .row-arrow {
+  transform: translateX(3px);
+}
+
+/* ── Accessibility ────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+  .bar-fill { transform: scaleX(1); }
+}
