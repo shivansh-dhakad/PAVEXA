@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight, Camera, ChevronLeft, ChevronRight, ExternalLink,
@@ -117,14 +117,53 @@ const WORKSPACES = [
 /** Slides its children in from the side the first time they scroll into view. */
 function Reveal({
   children,
+  from = "up",
+  delay = 0,
   className = "",
 }: {
   children: ReactNode;
-  from?: "left" | "right";
+  from?: "left" | "right" | "up";
   delay?: number;
   className?: string;
 }) {
-  return <div className={className}>{children}</div>;
+  const ref = useRef<HTMLDivElement>(null);
+  const [isIn, setIsIn] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      !("IntersectionObserver" in window)
+    ) {
+      setIsIn(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsIn(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -32px 0px" },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`reveal reveal-${from} ${isIn ? "is-in" : ""} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function SectionHead({ title, body }: { title: string; body: string }) {
@@ -143,7 +182,7 @@ export default function Landing() {
   const go = (n: number) => setIdx((n + CLASSES.length) % CLASSES.length);
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-canvas text-body">
+    <div className="relative isolate min-h-screen overflow-x-clip text-body">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-line bg-surface/95">
         <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between px-6 lg:px-8">
@@ -169,11 +208,17 @@ export default function Landing() {
             </Link>
           </div>
         </div>
+        <nav aria-label="Page sections" className="flex gap-5 overflow-x-auto border-t border-line px-6 py-3 text-xs font-semibold text-muted md:hidden">
+          <a href="#pipeline" className="shrink-0 transition-colors hover:text-ink">How it works</a>
+          <a href="#classes" className="shrink-0 transition-colors hover:text-ink">Damage classes</a>
+          <a href="#results" className="shrink-0 transition-colors hover:text-ink">Results</a>
+          <a href="#workspaces" className="shrink-0 transition-colors hover:text-ink">Workspaces</a>
+        </nav>
       </header>
 
       {/* ── Hero ───────────────────────────────────────────────────── */}
-      <section className="bg-surface">
-        <div className="mx-auto grid w-full max-w-[1440px] gap-12 px-6 py-16 lg:min-h-[640px] lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:px-8 lg:py-20">
+      <section className="bg-surface/80">
+        <div className="relative z-10 mx-auto grid w-full max-w-[1440px] gap-12 px-6 py-16 lg:min-h-[640px] lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:px-8 lg:py-20">
           <div>
             <p className="mb-5 font-mono text-xs text-primary">Road damage triage</p>
             <h1 className="max-w-xl text-4xl font-semibold leading-[1.08] tracking-tight text-ink sm:text-5xl lg:text-6xl">
@@ -232,28 +277,33 @@ export default function Landing() {
             </div>
           </div>
         </div>
-
-        {/* Lane marking slides along the bottom edge of the hero */}
-        <div className="lane" aria-hidden />
       </section>
 
-      {/* ── Ticker ─────────────────────────────────────────────────── */}
-      <section aria-label="Project facts" className="overflow-x-auto border-b border-line bg-canvas py-4">
-        <div className="mx-auto flex w-max min-w-full max-w-[1440px]">
-          {TICKER.map((t) => (
-            <span
-              key={t}
-              className="mx-6 inline-flex shrink-0 items-center gap-3 whitespace-nowrap font-mono text-xs text-body first:ml-6 lg:first:ml-8"
+      {/* ── Continuous project-facts ticker ─────────────────────────── */}
+      <section aria-label="Project facts" className="marquee border-b border-line bg-canvas/80 py-4">
+        <div className="marquee-track">
+          {[false, true].map((isDuplicate) => (
+            <div
+              key={String(isDuplicate)}
+              className="marquee-group flex w-max shrink-0"
+              aria-hidden={isDuplicate || undefined}
             >
-              <span className="size-1.5 rounded-full bg-marking" aria-hidden />
-              {t}
-            </span>
+              {TICKER.map((t) => (
+                <span
+                  key={t}
+                  className="mx-6 inline-flex shrink-0 items-center gap-3 whitespace-nowrap font-mono text-xs text-body"
+                >
+                  <span className="size-1.5 rounded-full bg-marking" aria-hidden />
+                  {t}
+                </span>
+              ))}
+            </div>
           ))}
         </div>
       </section>
 
       {/* ── How it works ───────────────────────────────────────────── */}
-      <section id="pipeline" className="mx-auto w-full max-w-[1440px] scroll-mt-16 px-6 py-20 lg:px-8 lg:py-28">
+      <section id="pipeline" className="mx-auto w-full max-w-[1440px] scroll-mt-28 px-6 py-20 lg:px-8 lg:py-28">
         <Reveal from="left">
           <SectionHead
             title="From camera frame to a scored road in four steps"
@@ -281,7 +331,7 @@ export default function Landing() {
       </section>
 
       {/* ── Damage classes (sliding carousel) ──────────────────────── */}
-      <section id="classes" className="scroll-mt-16 border-y border-line bg-surface">
+      <section id="classes" className="scroll-mt-28 border-y border-line bg-surface/80">
         <div className="mx-auto w-full max-w-[1440px] px-6 py-20 lg:px-8 lg:py-28">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <Reveal from="left">
@@ -381,7 +431,7 @@ export default function Landing() {
       </section>
 
       {/* ── Results ────────────────────────────────────────────────── */}
-      <section id="results" className="mx-auto w-full max-w-[1440px] scroll-mt-16 px-6 py-20 lg:px-8 lg:py-28">
+      <section id="results" className="mx-auto w-full max-w-[1440px] scroll-mt-28 px-6 py-20 lg:px-8 lg:py-28">
         <Reveal from="left">
           <SectionHead
             title="Why the ensemble won"
@@ -463,7 +513,7 @@ export default function Landing() {
       </section>
 
       {/* ── Road Health Index ──────────────────────────────────────── */}
-      <section className="border-y border-line bg-surface">
+      <section className="border-y border-line bg-surface/80">
         <div className="mx-auto grid w-full max-w-[1440px] gap-12 px-6 py-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-8 lg:py-28">
           <Reveal from="left">
             <SectionHead
@@ -511,7 +561,7 @@ export default function Landing() {
       </section>
 
       {/* ── Workspaces ─────────────────────────────────────────────── */}
-      <section id="workspaces" className="mx-auto w-full max-w-[1440px] scroll-mt-16 px-6 py-20 lg:px-8 lg:py-28">
+      <section id="workspaces" className="mx-auto w-full max-w-[1440px] scroll-mt-28 px-6 py-20 lg:px-8 lg:py-28">
         <Reveal from="left">
           <SectionHead
             title="Choose a demo login"
@@ -543,8 +593,7 @@ export default function Landing() {
       </section>
 
       {/* ── Footer ─────────────────────────────────────────────────── */}
-      <footer className="border-t border-line bg-surface">
-        <div className="lane" aria-hidden />
+      <footer className="border-t border-line bg-surface/90">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-6 py-12 sm:flex-row sm:items-start sm:justify-between lg:px-8">
           <div className="max-w-sm">
             <div className="flex items-center gap-2 text-ink">

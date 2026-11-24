@@ -72,7 +72,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-transparent">
       {/* Header */}
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between px-6 lg:px-8">

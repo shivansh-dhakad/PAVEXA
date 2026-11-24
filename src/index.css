@@ -50,6 +50,23 @@ body {
   @apply bg-canvas font-sans text-body antialiased;
 }
 
+.pavexa-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+  background: #f8fafc;
+  opacity: 0.2;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 7rem;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
@@ -102,25 +119,9 @@ body {
   animation: pulse-slow 6s ease-in-out infinite;
 }
 
-/* ── Sliding motion (landing page) ────────────────────────────────── */
+/* ── Landing-page ticker ──────────────────────────────────────────── */
 
-/* Lane-marking divider: dashes travel along the road */
-@keyframes lane-slide {
-  from { background-position: 0 0; }
-  to   { background-position: -96px 0; }
-}
-
-.lane {
-  height: 6px;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--color-marking) 0 48px,
-    transparent 48px 96px
-  );
-  background-size: 96px 6px;
-}
-
-/* Ticker: content slides right-to-left, duplicated list loops at -50% */
+/* Two identical groups make the ticker loop without a visible reset. */
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
@@ -132,7 +133,16 @@ body {
   animation: marquee 48s linear infinite;
 }
 
-.marquee:hover .marquee-track {
+.marquee {
+  overflow-x: clip;
+}
+
+.marquee::-webkit-scrollbar {
+  display: none;
+}
+
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track {
   animation-play-state: paused;
 }
 
@@ -150,19 +160,25 @@ body {
 .enter-left  { animation: enter-left 800ms var(--ease-smooth) both; }
 .enter-right { animation: enter-right 900ms var(--ease-smooth) 120ms both; }
 
-/* Scroll reveal: slides in from the side when it enters the viewport */
+/* Scroll reveal: a short rise and fade when content enters the viewport */
 .reveal {
   opacity: 0;
   transition:
-    transform 800ms var(--ease-smooth),
-    opacity 800ms var(--ease-smooth);
+    transform 600ms var(--ease-smooth),
+    opacity 600ms var(--ease-smooth);
 }
-.reveal-left  { transform: translateX(-48px); }
-.reveal-right { transform: translateX(48px); }
-.reveal.is-in { opacity: 1; transform: translateX(0); }
+.reveal-up    { transform: translateY(18px); }
+.reveal-left  { transform: translateX(-16px); }
+.reveal-right { transform: translateX(16px); }
+.reveal.is-in { opacity: 1; transform: translate(0, 0); }
 
-/* Bars slide out from the left edge once revealed */
+/* Bars fill once their section enters the viewport */
 .bar-fill {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 800ms var(--ease-smooth);
+}
+.reveal.is-in .bar-fill {
   transform: scaleX(1);
 }
 
@@ -181,6 +197,7 @@ body {
 
 /* ── Accessibility ────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
@@ -188,4 +205,10 @@ body {
   }
   .reveal { opacity: 1; transform: none; }
   .bar-fill { transform: scaleX(1); }
+  .marquee {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .marquee-track { animation: none; }
+  .marquee-group[aria-hidden="true"] { display: none; }
 }

@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from "react-router-dom";
 import TopNav from "./TopNav";
 import ErrorBoundary from "./ErrorBoundary";
+import PavexaBackground from "./PavexaBackground";
 
 export default function Layout() {
   const { pathname } = useLocation();
@@ -10,7 +11,8 @@ export default function Layout() {
     : "mx-auto w-full max-w-[1440px] px-6 py-8 lg:px-8";
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="relative isolate min-h-screen bg-transparent">
+      <PavexaBackground />
       {!isBarePage && <TopNav />}
       <ErrorBoundary key={pathname}>
         <main className={mainClassName}>
