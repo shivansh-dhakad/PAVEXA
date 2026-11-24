@@ -319,10 +319,13 @@ roadguard-ai/
 │   │   └── yolo26s(640).pt           # Secondary rapid-context detector (640px)
 │   ├── database.py                   # SQLite schema, seed data, stats aggregator
 │   ├── main.py                       # FastAPI application & WBF fusion engine
-│   └── pavexa.db                     # SQLite database instance
+│   ├── pavexa.db                     # SQLite database instance
+│   └── create_samples.py             # Script to generate sample ZIP & MP4
 ├── public/
 │   ├── samples/
-│   │   └── img_*.jpg                 # RDD2020 sample images
+│   │   ├── img_000012.jpg            # RDD2020 sample images
+│   │   ├── rdd2020_sample_batch.zip  # Instant 1-click sample batch archive
+│   │   └── road_survey_sample.mp4    # Instant 1-click sample driving video
 │   ├── hero-road.jpg                 # Hero road image with D20 detection box
 │   ├── favicon.svg                   # Radar road geometric favicon
 │   ├── logitudinal.svg               # D00 pathology vector diagram
