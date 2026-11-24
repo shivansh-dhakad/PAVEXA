@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: roadguard-ai-api
+    name: Pavexa
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
