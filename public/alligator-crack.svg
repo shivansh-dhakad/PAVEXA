@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="400" height="260" fill="none">
+  <defs>
+    
+    <pattern id="asphalt-grain" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="3" r="0.7" fill="#CBD5E1" opacity="0.6" />
+      <circle cx="8" cy="2" r="0.5" fill="#94A3B8" opacity="0.5" />
+      <circle cx="5" cy="8" r="0.8" fill="#CBD5E1" opacity="0.6" />
+      <circle cx="10" cy="10" r="0.6" fill="#94A3B8" opacity="0.4" />
+    </pattern>
+
+    
+    <filter id="crack-depth" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="1" stdDeviation="0.6" flood-color="#FFFFFF" flood-opacity="0.9" />
+    </filter>
+  </defs>
+
+  
+  <rect x="0" y="0" width="400" height="260" rx="12" fill="#F1F5F9" />
+  <rect x="0" y="0" width="400" height="260" rx="12" fill="url(#asphalt-grain)" />
+  <rect x="0.5" y="0.5" width="399" height="259" rx="11.5" stroke="#E2E8F0" />
+
+  
+  <line x1="24" y1="28" x2="376" y2="28" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="14 10" stroke-linecap="round" />
+
+  
+  <g filter="url(#crack-depth)" stroke="#1E293B" stroke-linecap="round" stroke-linejoin="round">
+    
+    
+    <path d="M88 122 L64 108 L46 113 M64 108 L55 92" stroke-width="1.3" opacity="0.75" />
+    <path d="M132 76 L118 56 L102 48 M118 56 L134 44" stroke-width="1.3" opacity="0.75" />
+    <path d="M254 74 L272 54 L292 49 M272 54 L266 38" stroke-width="1.3" opacity="0.75" />
+    <path d="M312 138 L338 126 L356 132 M338 126 L348 110" stroke-width="1.3" opacity="0.75" />
+    <path d="M278 194 L302 212 L322 218 M302 212 L294 228" stroke-width="1.3" opacity="0.75" />
+    <path d="M126 196 L102 214 L82 219 M102 214 L108 231" stroke-width="1.3" opacity="0.75" />
+
+    
+    <path d="
+      M 132 76 L 176 68 L 218 72 L 254 74
+      L 288 102 L 312 138 L 298 174 L 278 194
+      L 232 206 L 178 208 L 126 196 L 96 164
+      L 88 122 L 112 92 Z" stroke-width="2.4" fill="#E2E8F0" fill-opacity="0.35" />
+
+    
+    <path d="M 132 76 L 154 106 L 112 92" stroke-width="2.1" />
+    <path d="M 176 68 L 184 102 L 154 106" stroke-width="2.2" />
+    <path d="M 218 72 L 214 108 L 184 102" stroke-width="2.2" />
+    <path d="M 254 74 L 246 112 L 214 108" stroke-width="2.0" />
+    <path d="M 288 102 L 268 132 L 246 112" stroke-width="2.1" />
+    
+    <path d="M 88 122 L 128 134 L 154 106" stroke-width="2.1" />
+    <path d="M 128 134 L 166 138 L 184 102" stroke-width="2.5" />
+    <path d="M 166 138 L 208 142 L 214 108" stroke-width="2.6" />
+    <path d="M 208 142 L 248 138 L 246 112" stroke-width="2.4" />
+    <path d="M 248 138 L 276 154 L 268 132 L 312 138" stroke-width="2.1" />
+
+    <path d="M 96 164 L 134 166 L 128 134" stroke-width="2.0" />
+    <path d="M 134 166 L 172 172 L 166 138" stroke-width="2.4" />
+    <path d="M 172 172 L 216 170 L 208 142" stroke-width="2.5" />
+    <path d="M 216 170 L 254 168 L 248 138" stroke-width="2.3" />
+    <path d="M 254 168 L 298 174" stroke-width="2.0" />
+
+    <path d="M 126 196 L 148 184 L 134 166" stroke-width="1.9" />
+    <path d="M 178 208 L 172 172" stroke-width="2.2" />
+    <path d="M 232 206 L 224 186 L 216 170" stroke-width="2.1" />
+    <path d="M 278 194 L 254 168" stroke-width="1.9" />
+
+    
+    <path d="M 148 184 L 174 188 M 192 122 L 202 126 M 228 154 L 238 160 M 146 120 L 138 124" stroke-width="1.1" opacity="0.7" />
+  </g>
+
+  
+  <g>
+    <rect x="76" y="60" width="248" height="156" rx="4" stroke="#EA580C" stroke-width="1.5" stroke-dasharray="5 3" fill="#EA580C" fill-opacity="0.04" />
+    
+    
+    <path d="M76 70 V60 H86 M314 60 H324 V70 M324 206 V216 H314 M86 216 H76 V206" stroke="#EA580C" stroke-width="2" />
+
+    
+    <rect x="76" y="40" width="128" height="20" rx="4" fill="#EA580C" />
+    <text x="84" y="53" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600" letter-spacing="0.03em">
+      D20 · ALLIGATOR
+    </text>
+  </g>
+</svg>
