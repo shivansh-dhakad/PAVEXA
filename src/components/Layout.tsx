@@ -5,18 +5,16 @@ import PavexaBackground from "./PavexaBackground";
 
 export default function Layout() {
   const { pathname } = useLocation();
-  const isBarePage = pathname === "/" || pathname === "/login";
-  const mainClassName = isBarePage
-    ? "w-full"
-    : "mx-auto w-full max-w-[1440px] px-6 py-8 lg:px-8";
 
   return (
     <div className="relative isolate min-h-screen bg-transparent">
       <PavexaBackground />
-      {!isBarePage && <TopNav />}
+      <TopNav />
       <ErrorBoundary key={pathname}>
-        <main className={mainClassName}>
-          <Outlet />
+        <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div key={pathname} className="page-enter">
+            <Outlet />
+          </div>
         </main>
       </ErrorBoundary>
     </div>

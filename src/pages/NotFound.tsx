@@ -7,12 +7,12 @@ export default function NotFound() {
     <ErrorView
       icon={Compass}
       code="404 / ROUTE_NOT_FOUND"
-      title="This route is off the survey map"
-      body="Nothing exists at this address. Go back to the home page or sign in to a workspace."
+      title="Page not found"
+      body="This address does not match the project dashboard or prediction testing page."
       actions={
         <>
           <Link to="/" className="btn btn-primary">Home</Link>
-          <Link to="/login" className="btn btn-ghost">Sign in</Link>
+          <Link to="/predict" className="btn btn-ghost">Predictions</Link>
         </>
       }
     />

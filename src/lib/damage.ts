@@ -8,10 +8,10 @@ export const DAMAGE_CLASSES: Record<DamageCode, { label: string; color: string; 
 };
 
 export const CLASS_COLORS: Record<DamageCode, string> = {
-  D00: "#0891b2",
-  D10: "#d97706",
-  D20: "#7c3aed",
-  D40: "#dc2626",
+  D00: "#177e89",
+  D10: "#a96718",
+  D20: "#596d91",
+  D40: "#b24b34",
 };
 
 export interface Detection {

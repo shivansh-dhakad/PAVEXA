@@ -1,418 +1,307 @@
 import { useEffect, useRef } from "react";
 
-type RGB = readonly [number, number, number];
+type RGB = [number, number, number];
 
-interface BackgroundNode {
-  bx: number;
-  by: number;
-  ax: number;
-  ay: number;
-  frequency: number;
-  phase: number;
-  alternate: boolean;
+interface PavexaBackgroundProps {
+  /** Animation speed multiplier (1 = default). */
+  speed?: number;
+  /** Strength of the sweeping LiDAR scan lines, 0–1. */
+  lidar?: number;
+  /** Extra classes for the canvas element. */
+  className?: string;
 }
 
-interface Point extends BackgroundNode {
-  x: number;
-  y: number;
-}
-
-const PERIOD = 64;
-const LOOP_SECONDS = 24;
 const TWO_PI = Math.PI * 2;
-const CONFIG = {
-  speed: 1,
-  columns: 18,
-  rows: 36,
-  lidar: 0.85,
+const PERIOD = 64;
+const LOOP_SEC = 24;
+const COLS = 18;
+const ROWS = 36;
+
+const C = {
   bg: "#F8FAFC",
-  surface: "#FFFFFF",
+  hw: "#FFFFFF",
   glow: "rgba(37, 99, 235, 0.08)",
-  blue: [37, 99, 235] as RGB,
+  p: [37, 99, 235] as RGB,
   sky: [2, 132, 199] as RGB,
-  amber: [217, 119, 6] as RGB,
-  coral: [225, 29, 72] as RGB,
-  gray: [148, 163, 184] as RGB,
-  grayLight: [203, 213, 225] as RGB,
+  amb: [217, 119, 6] as RGB,
+  cor: [225, 29, 72] as RGB,
+  g: [148, 163, 184] as RGB,
+  gf: [203, 213, 225] as RGB,
 };
 
-const NODES: BackgroundNode[] = Array.from({ length: 22 }, (_, index) => {
-  const random = (seed: number) => {
-    const value = Math.sin(index * seed) * 43758.5453;
-    return value - Math.floor(value);
+const NODES = Array.from({ length: 22 }, (_, i) => {
+  const r = (k: number) => {
+    const x = Math.sin(i * k) * 43758.5453;
+    return x - Math.floor(x);
   };
-
   return {
-    bx: random(12.98),
-    by: 0.07 + random(78.23) * 0.34,
-    ax: 0.016 + random(39.42) * 0.028,
-    ay: 0.012 + random(19.19) * 0.022,
-    frequency: (index % 3) + 1,
-    phase: random(78.23) * TWO_PI,
-    alternate: index % 5 === 0,
+    bx: r(12.98),
+    by: 0.07 + r(78.23) * 0.34,
+    ax: 0.016 + r(39.42) * 0.028,
+    ay: 0.012 + r(19.19) * 0.022,
+    f: (i % 3) + 1,
+    ph: r(78.23) * TWO_PI,
+    alt: i % 5 === 0,
   };
 });
 
-function elevation(column: number, row: number) {
-  const wrappedRow = ((row % PERIOD) + PERIOD) % PERIOD;
-  const theta = (wrappedRow / PERIOD) * TWO_PI;
-  const absColumn = Math.abs(column);
-  const crown =
-    absColumn < 0.44
-      ? -0.07 * Math.cos((column / 0.44) * 1.5708)
-      : Math.pow((absColumn - 0.44) / 0.56, 1.8) * 0.82;
+const rgba = (rgb: RGB, a: number) =>
+  `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
 
+function elev(col: number, row: number) {
+  const wr = ((row % PERIOD) + PERIOD) % PERIOD;
+  const th = (wr / PERIOD) * TWO_PI;
+  const ax = Math.abs(col);
+  const crown =
+    ax < 0.44 ? -0.07 * Math.cos((col / 0.44) * 1.5708) : Math.pow((ax - 0.44) / 0.56, 1.8) * 0.82;
   return (
     crown +
-    Math.sin(theta * 2 + column * 4.5) * 0.12 +
-    Math.cos(theta * 3 - column * 7) * 0.07 +
-    (absColumn >= 0.44
-      ? (Math.sin(theta * 4 + column * 9) * 0.2 +
-          Math.cos(theta + column * 5) * 0.16) *
-        ((absColumn - 0.44) / 0.56)
+    Math.sin(th * 2 + col * 4.5) * 0.12 +
+    Math.cos(th * 3 - col * 7) * 0.07 +
+    (ax >= 0.44
+      ? (Math.sin(th * 4 + col * 9) * 0.2 + Math.cos(th + col * 5) * 0.16) * ((ax - 0.44) / 0.56)
       : 0)
   );
 }
 
-function rgba(color: RGB, alpha: number) {
-  const boundedAlpha = Math.max(0, Math.min(1, alpha));
-  return `rgba(${color[0]},${color[1]},${color[2]},${boundedAlpha.toFixed(3)})`;
+interface GridPoint {
+  x: number;
+  y: number;
+  cn: number;
+  dp: number;
+  env: number;
+  lb: number;
+  wr: number;
 }
 
-export default function PavexaBackground() {
+export default function PavexaBackground({
+  speed = 1,
+  lidar = 0.85,
+  className = "pointer-events-none fixed inset-0 -z-10 h-full w-full",
+}: PavexaBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d", { alpha: false });
-    if (!canvas || !context) return;
+    const maybeCanvas = canvasRef.current;
+    if (!maybeCanvas) return;
+    const maybeCtx = maybeCanvas.getContext("2d", { alpha: false });
+    if (!maybeCtx) return;
+    const canvas: HTMLCanvasElement = maybeCanvas;
+    const ctx: CanvasRenderingContext2D = maybeCtx;
 
-    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let width = 0;
-    let height = 0;
-    let mouseX = 0;
-    let mouseY = 0;
-    let targetMouseX = 0;
-    let targetMouseY = 0;
-    let distance = 0;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let w = 0;
+    let h = 0;
+    let mx = 0;
+    let my = 0;
+    let tmx = 0;
+    let tmy = 0;
+    let dist = 0;
     let clock = 0;
-    let lastFrameTime = performance.now();
-    let animationFrame = 0;
-    let isRunning = false;
+    let last = performance.now();
+    let raf = 0;
+
+    const draw = (dt: number) => {
+      mx += (tmx - mx) * 0.05;
+      my += (tmy - my) * 0.05;
+      dist = (dist + dt * 5.0 * speed) % PERIOD;
+      clock = (clock + dt * speed) % LOOP_SEC;
+
+      const hy = h * (0.42 + my * 0.02);
+      const vx = w * (0.5 + mx * 0.04);
+      const th = (clock / LOOP_SEC) * TWO_PI;
+
+      const bgG = ctx.createLinearGradient(0, 0, 0, h);
+      bgG.addColorStop(0, C.bg);
+      bgG.addColorStop(0.42, C.hw);
+      bgG.addColorStop(1, C.bg);
+      ctx.fillStyle = bgG;
+      ctx.fillRect(0, 0, w, h);
+
+      const rg = ctx.createRadialGradient(vx, hy, 12, vx, hy, Math.max(w, h) * 0.65);
+      rg.addColorStop(0, C.glow);
+      rg.addColorStop(0.6, "rgba(255,255,255,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, w, h);
+
+      for (let i = 0; i < 4; i++) {
+        ctx.strokeStyle = rgba(C.gf, 0.22 + i * 0.06);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let s = 0; s <= 64; s++) {
+          const u = s / 64;
+          const y =
+            hy * (0.26 + i * 0.15) +
+            Math.sin(u * 12.566 + th + i * 1.15) * 12 +
+            Math.cos(u * 21.991 - th * 2 + i * 0.75) * 5;
+          if (s) ctx.lineTo(u * w, y);
+          else ctx.moveTo(u * w, y);
+        }
+        ctx.stroke();
+      }
+
+      const pts = NODES.map((n) => ({
+        ...n,
+        x: (n.bx + Math.sin(th * n.f + n.ph) * n.ax + mx * 0.012) * w,
+        y: (n.by + Math.cos(th * n.f + n.ph) * n.ay + my * 0.008) * h,
+      }));
+      const md = Math.min(w, h) * 0.21;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+          if (d < md) {
+            ctx.strokeStyle = rgba(C.p, (1 - d / md) * 0.18);
+            ctx.lineWidth = 0.85;
+            ctx.beginPath();
+            ctx.moveTo(pts[i].x, pts[i].y);
+            ctx.lineTo(pts[j].x, pts[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+      pts.forEach((n) => {
+        ctx.fillStyle = rgba(n.alt ? C.amb : C.p, 0.55);
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.alt ? 2.3 : 1.8, 0, TWO_PI);
+        ctx.fill();
+      });
+
+      const iRow = Math.floor(dist);
+      const fRow = dist - iRow;
+      const lw1 = (dist / 16) % 1;
+      const lw2 = ((dist + 8) / 16) % 1;
+      const fov = Math.min(w, h) * 0.68;
+
+      const grid: GridPoint[][] = Array.from({ length: ROWS + 1 }, (_, r) => {
+        const zn = (r + (1 - fRow)) / ROWS;
+        const sc = fov / (1.4 + Math.pow(zn, 1.55) * 34);
+        const wr = iRow + (ROWS - r);
+        const dp = 1 - zn;
+        const env = Math.sin(dp * Math.PI);
+        const wDist = Math.min(
+          Math.abs(dp - lw1),
+          Math.abs(dp - lw2),
+          1 - Math.abs(dp - lw1),
+          1 - Math.abs(dp - lw2),
+        );
+        const lb = lidar * Math.exp(-Math.pow(wDist / 0.048, 2)) * env;
+        return Array.from({ length: COLS + 1 }, (_, col) => {
+          const cn = (col / COLS) * 2 - 1;
+          return { x: vx + cn * 5.4 * sc, y: hy + (2.35 - elev(cn, wr)) * sc, cn, dp, env, lb, wr };
+        });
+      });
+
+      const lCol = Math.max(0, Math.round(COLS * 0.28));
+      const rCol = Math.min(COLS, Math.round(COLS * 0.72));
+      for (let r = 0; r < ROWS; r++) {
+        const p1 = grid[r][lCol];
+        const p2 = grid[r][rCol];
+        const p3 = grid[r + 1][rCol];
+        const p4 = grid[r + 1][lCol];
+        const fade = Math.pow(p1.dp, 1.4) * p1.env;
+        if (fade < 0.02) continue;
+        ctx.fillStyle = rgba([226, 232, 240], fade * 0.35 + p1.lb * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.lineTo(p3.x, p3.y);
+        ctx.lineTo(p4.x, p4.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      for (let r = 0; r < ROWS; r++) {
+        const row = grid[r];
+        const fade = Math.pow(row[0].dp, 1.25) * row[0].env;
+        if (fade < 0.01) continue;
+        ctx.strokeStyle = rgba(row[0].lb > 0.14 ? C.p : C.g, Math.min(0.88, fade * 0.42 + row[0].lb * 0.65));
+        ctx.lineWidth = 0.9 + row[0].lb * 1.45;
+        ctx.beginPath();
+        row.forEach((p, idx) => (idx ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+      }
+
+      for (let col = 0; col <= COLS; col++) {
+        const cn = (col / COLS) * 2 - 1;
+        const edge = Math.abs(Math.abs(cn) - 0.44) < 1.05 / COLS;
+        const mid = Math.abs(cn) < 0.6 / COLS;
+        for (let r = 0; r < ROWS; r++) {
+          const p1 = grid[r][col];
+          const p2 = grid[r + 1][col];
+          const fade = Math.pow(p1.dp, 1.2) * p1.env;
+          if (fade < 0.01) continue;
+          const b = Math.max(p1.lb, p2.lb);
+          if (mid && ((p1.wr % 6) + 6) % 6 >= 3) continue;
+          ctx.strokeStyle = mid
+            ? rgba(C.amb, Math.min(0.92, fade * 0.78 + b * 0.25))
+            : edge
+              ? rgba(C.p, Math.min(0.88, fade * 0.62 + b * 0.4))
+              : rgba(b > 0.16 ? C.sky : C.g, Math.min(0.85, fade * (Math.abs(cn) < 0.44 ? 0.36 : 0.26) + b * 0.55));
+          ctx.lineWidth = mid ? 1.8 : edge ? 1.4 : 0.85 + b * 1.15;
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      }
+
+      const markers = [C.p, C.sky, C.amb, C.cor];
+      for (let r = 1; r < ROWS - 2; r += 3) {
+        const row = grid[r];
+        const fade = Math.pow(row[0].dp, 1.3) * row[0].env;
+        if (fade < 0.14) continue;
+        for (let col = 2; col < COLS - 1; col += 2) {
+          const pt = row[col];
+          if (Math.abs(pt.cn) > 0.46) continue;
+          const hVal = Math.sin(pt.wr * 19.19 + col * 47.77) * 43758.5453;
+          const frac = hVal - Math.floor(hVal);
+          if (frac > 0.78) {
+            const idx = Math.floor(((frac - 0.78) / 0.22) * 4) % 4;
+            const rad = (1.8 + fade * 2.1) * (1 + pt.lb * 0.45);
+            ctx.fillStyle = rgba(markers[idx], Math.min(0.95, fade * 0.78 + pt.lb * 0.65));
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, rad, 0, TWO_PI);
+            ctx.fill();
+          }
+        }
+      }
+    };
 
     const resize = () => {
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-      width = document.documentElement.clientWidth;
-      height = window.innerHeight;
-      canvas.width = Math.round(width * pixelRatio);
-      canvas.height = Math.round(height * pixelRatio);
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (reduceMotion) draw(0);
     };
 
-    const handleMouseMove = (event: MouseEvent) => {
-      targetMouseX = (event.clientX / Math.max(1, width) - 0.5) * 2;
-      targetMouseY = (event.clientY / Math.max(1, height) - 0.5) * 2;
+    const onMove = (e: MouseEvent) => {
+      tmx = (e.clientX / Math.max(1, w) - 0.5) * 2;
+      tmy = (e.clientY / Math.max(1, h) - 0.5) * 2;
     };
 
-    const draw = (now: number, animate: boolean) => {
-      if (animate && now - lastFrameTime < 1000 / 30) {
-        animationFrame = window.requestAnimationFrame((time) => draw(time, true));
-        return;
-      }
-
-      const deltaTime = animate
-        ? Math.min((now - lastFrameTime) / 1000, 0.1)
-        : 0;
-      lastFrameTime = now;
-      if (animate) {
-        mouseX += (targetMouseX - mouseX) * 0.05;
-        mouseY += (targetMouseY - mouseY) * 0.05;
-        distance = (distance + deltaTime * 5 * CONFIG.speed) % PERIOD;
-        clock = (clock + deltaTime * CONFIG.speed) % LOOP_SECONDS;
-      }
-
-      const horizonY = height * (0.42 + mouseY * 0.02);
-      const vanishingX = width * (0.5 + mouseX * 0.04);
-      const theta = (clock / LOOP_SECONDS) * TWO_PI;
-      const background = context.createLinearGradient(0, 0, 0, height);
-      background.addColorStop(0, CONFIG.bg);
-      background.addColorStop(0.42, CONFIG.surface);
-      background.addColorStop(1, CONFIG.bg);
-      context.fillStyle = background;
-      context.fillRect(0, 0, width, height);
-
-      const glow = context.createRadialGradient(
-        vanishingX,
-        horizonY,
-        12,
-        vanishingX,
-        horizonY,
-        Math.max(width, height) * 0.65,
-      );
-      glow.addColorStop(0, CONFIG.glow);
-      glow.addColorStop(0.6, "rgba(255,255,255,0)");
-      context.fillStyle = glow;
-      context.fillRect(0, 0, width, height);
-
-      for (let index = 0; index < 4; index += 1) {
-        context.strokeStyle = rgba(CONFIG.grayLight, 0.22 + index * 0.06);
-        context.lineWidth = 1;
-        context.beginPath();
-        for (let step = 0; step <= 64; step += 1) {
-          const progress = step / 64;
-          const y =
-            horizonY * (0.26 + index * 0.15) +
-            Math.sin(progress * 12.566 + theta + index * 1.15) * 12 +
-            Math.cos(progress * 21.991 - theta * 2 + index * 0.75) * 5;
-          if (step === 0) context.moveTo(progress * width, y);
-          else context.lineTo(progress * width, y);
-        }
-        context.stroke();
-      }
-
-      const points: Point[] = NODES.map((node) => ({
-        ...node,
-        x:
-          (node.bx +
-            Math.sin(theta * node.frequency + node.phase) * node.ax +
-            mouseX * 0.012) *
-          width,
-        y:
-          (node.by +
-            Math.cos(theta * node.frequency + node.phase) * node.ay +
-            mouseY * 0.008) *
-          height,
-      }));
-      const maxDistance = Math.min(width, height) * 0.21;
-
-      for (let first = 0; first < points.length; first += 1) {
-        for (let second = first + 1; second < points.length; second += 1) {
-          const start = points[first];
-          const end = points[second];
-          const separation = Math.hypot(start.x - end.x, start.y - end.y);
-          if (separation >= maxDistance) continue;
-
-          context.strokeStyle = rgba(
-            CONFIG.blue,
-            (1 - separation / maxDistance) * 0.18,
-          );
-          context.lineWidth = 0.85;
-          context.beginPath();
-          context.moveTo(start.x, start.y);
-          context.lineTo(end.x, end.y);
-          context.stroke();
-        }
-      }
-
-      points.forEach((point) => {
-        context.fillStyle = rgba(
-          point.alternate ? CONFIG.amber : CONFIG.blue,
-          0.55,
-        );
-        context.beginPath();
-        context.arc(point.x, point.y, point.alternate ? 2.3 : 1.8, 0, TWO_PI);
-        context.fill();
-      });
-
-      const firstRow = Math.floor(distance);
-      const rowFraction = distance - firstRow;
-      const firstLidarWave = (distance / 16) % 1;
-      const secondLidarWave = ((distance + 8) / 16) % 1;
-      const fieldOfView = Math.min(width, height) * 0.68;
-      const grid = Array.from({ length: CONFIG.rows + 1 }, (_, row) => {
-        const depth = (row + (1 - rowFraction)) / CONFIG.rows;
-        const scale = fieldOfView / (1.4 + Math.pow(depth, 1.55) * 34);
-        const worldRow = firstRow + (CONFIG.rows - row);
-        const distanceProgress = 1 - depth;
-        const envelope = Math.sin(distanceProgress * Math.PI);
-        const waveDistance = Math.min(
-          Math.abs(distanceProgress - firstLidarWave),
-          Math.abs(distanceProgress - secondLidarWave),
-          1 - Math.abs(distanceProgress - firstLidarWave),
-          1 - Math.abs(distanceProgress - secondLidarWave),
-        );
-        const lidar = CONFIG.lidar * Math.exp(-Math.pow(waveDistance / 0.048, 2)) * envelope;
-
-        return Array.from({ length: CONFIG.columns + 1 }, (_, column) => {
-          const normalizedColumn = (column / CONFIG.columns) * 2 - 1;
-          return {
-            x: vanishingX + normalizedColumn * 5.4 * scale,
-            y: horizonY + (2.35 - elevation(normalizedColumn, worldRow)) * scale,
-            normalizedColumn,
-            depthProgress: distanceProgress,
-            envelope,
-            lidar,
-            worldRow,
-          };
-        });
-      });
-
-      for (let row = 0; row < CONFIG.rows; row += 1) {
-        const first = grid[row][Math.round(CONFIG.columns * 0.28)];
-        const second = grid[row][Math.round(CONFIG.columns * 0.72)];
-        const third = grid[row + 1][Math.round(CONFIG.columns * 0.72)];
-        const fourth = grid[row + 1][Math.round(CONFIG.columns * 0.28)];
-        const fade = Math.pow(first.depthProgress, 1.4) * first.envelope;
-        if (fade < 0.02) continue;
-
-        context.fillStyle = rgba(
-          [226, 232, 240],
-          fade * 0.35 + first.lidar * 0.12,
-        );
-        context.beginPath();
-        context.moveTo(first.x, first.y);
-        context.lineTo(second.x, second.y);
-        context.lineTo(third.x, third.y);
-        context.lineTo(fourth.x, fourth.y);
-        context.closePath();
-        context.fill();
-      }
-
-      for (let rowIndex = 0; rowIndex < CONFIG.rows; rowIndex += 1) {
-        const row = grid[rowIndex];
-        const fade = Math.pow(row[0].depthProgress, 1.25) * row[0].envelope;
-        if (fade < 0.01) continue;
-
-        context.strokeStyle = rgba(
-          row[0].lidar > 0.14 ? CONFIG.blue : CONFIG.gray,
-          Math.min(0.88, fade * 0.42 + row[0].lidar * 0.65),
-        );
-        context.lineWidth = 0.9 + row[0].lidar * 1.45;
-        context.beginPath();
-        row.forEach((point, index) => {
-          if (index === 0) context.moveTo(point.x, point.y);
-          else context.lineTo(point.x, point.y);
-        });
-        context.stroke();
-      }
-
-      for (let column = 0; column <= CONFIG.columns; column += 1) {
-        const normalizedColumn = (column / CONFIG.columns) * 2 - 1;
-        const edge = Math.abs(Math.abs(normalizedColumn) - 0.44) < 1.05 / CONFIG.columns;
-        const middle = Math.abs(normalizedColumn) < 0.6 / CONFIG.columns;
-
-        for (let row = 0; row < CONFIG.rows; row += 1) {
-          const first = grid[row][column];
-          const second = grid[row + 1][column];
-          const fade = Math.pow(first.depthProgress, 1.2) * first.envelope;
-          if (fade < 0.01) continue;
-          if (middle && ((first.worldRow % 6) + 6) % 6 >= 3) continue;
-
-          const lidar = Math.max(first.lidar, second.lidar);
-          context.strokeStyle = middle
-            ? rgba(CONFIG.amber, Math.min(0.92, fade * 0.78 + lidar * 0.25))
-            : edge
-              ? rgba(CONFIG.blue, Math.min(0.88, fade * 0.62 + lidar * 0.4))
-              : rgba(
-                  lidar > 0.16 ? CONFIG.sky : CONFIG.gray,
-                  Math.min(
-                    0.85,
-                    fade * (Math.abs(normalizedColumn) < 0.44 ? 0.36 : 0.26) +
-                      lidar * 0.55,
-                  ),
-                );
-          context.lineWidth = middle
-            ? 1.8
-            : edge
-              ? 1.4
-              : 0.85 + lidar * 1.15;
-          context.beginPath();
-          context.moveTo(first.x, first.y);
-          context.lineTo(second.x, second.y);
-          context.stroke();
-        }
-      }
-
-      const damageColors = [
-        CONFIG.blue,
-        CONFIG.sky,
-        CONFIG.amber,
-        CONFIG.coral,
-      ];
-      for (let rowIndex = 1; rowIndex < CONFIG.rows - 2; rowIndex += 3) {
-        const row = grid[rowIndex];
-        const fade = Math.pow(row[0].depthProgress, 1.3) * row[0].envelope;
-        if (fade < 0.14) continue;
-
-        for (let column = 2; column < CONFIG.columns - 1; column += 2) {
-          const point = row[column];
-          if (Math.abs(point.normalizedColumn) > 0.46) continue;
-
-          const value =
-            Math.sin(point.worldRow * 19.19 + column * 47.77) * 43758.5453;
-          const fraction = value - Math.floor(value);
-          if (fraction <= 0.78) continue;
-
-          const colorIndex =
-            Math.floor(((fraction - 0.78) / 0.22) * damageColors.length) %
-            damageColors.length;
-          const radius = (1.8 + fade * 2.1) * (1 + point.lidar * 0.45);
-          context.fillStyle = rgba(
-            damageColors[colorIndex],
-            Math.min(0.95, fade * 0.78 + point.lidar * 0.65),
-          );
-          context.beginPath();
-          context.arc(point.x, point.y, radius, 0, TWO_PI);
-          context.fill();
-        }
-      }
-
-      if (animate && isRunning) {
-        animationFrame = window.requestAnimationFrame((time) => draw(time, true));
-      }
+    const loop = (now: number) => {
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      draw(dt);
+      raf = requestAnimationFrame(loop);
     };
 
-    const stop = () => {
-      isRunning = false;
-      window.cancelAnimationFrame(animationFrame);
-    };
-
-    const start = () => {
-      if (isRunning || motionPreference.matches || document.hidden) return;
-      isRunning = true;
-      lastFrameTime = performance.now();
-      animationFrame = window.requestAnimationFrame((time) => draw(time, true));
-    };
-
-    const handleMotionChange = () => {
-      if (motionPreference.matches) {
-        window.removeEventListener("mousemove", handleMouseMove);
-        stop();
-        draw(performance.now(), false);
-      } else {
-        window.addEventListener("mousemove", handleMouseMove, { passive: true });
-        start();
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) stop();
-      else start();
-    };
-
-    const handleResize = () => {
-      resize();
-      draw(performance.now(), false);
-    };
-
+    window.addEventListener("resize", resize);
     resize();
-    draw(lastFrameTime, false);
-    window.addEventListener("resize", handleResize);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    motionPreference.addEventListener("change", handleMotionChange);
-    if (!motionPreference.matches) {
-      window.addEventListener("mousemove", handleMouseMove, { passive: true });
-      start();
+    if (!reduceMotion) {
+      window.addEventListener("mousemove", onMove, { passive: true });
+      raf = requestAnimationFrame(loop);
     }
 
     return () => {
-      stop();
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      motionPreference.removeEventListener("change", handleMotionChange);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMove);
     };
-  }, []);
+  }, [speed, lidar]);
 
-  return <canvas ref={canvasRef} className="pavexa-background" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className={className} aria-hidden="true" />;
 }

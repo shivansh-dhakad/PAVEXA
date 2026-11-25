@@ -1,9 +1,3 @@
-/**
- * api.ts — Service layer for the PAVEXA Backend.
- * Connects to FastAPI endpoint running the YOLO26s Dual-Scale Ensemble (1088px + 640px with WBF).
- * Automatically falls back to high-fidelity mock if the local backend server is not running.
- */
-
 import type { Detection, DamageCode } from "./damage";
 
 export type ModelInferenceMode = "ensemble" | "main_only" | "640_only";
@@ -16,7 +10,6 @@ export interface InferenceResult {
   modelMode?: string;
   device?: string;
   modelsUsed?: string[];
-  isMock?: boolean;
 }
 
 export interface ModelBenchmarkInfo {
@@ -39,147 +32,118 @@ export interface ModelBenchmarkInfo {
   test_none_count: number;
 }
 
-// ── Fallback Benchmark Info (exact values from Kaggle notebook run) ───────────
 export const BENCHMARK_METRICS: ModelBenchmarkInfo = {
-  architecture: "YOLO26s Dual-Scale Ensemble (WBF)",
+  architecture: "YOLO26s dual-scale ensemble with test-time augmentation and Weighted Box Fusion",
   main_imgsz: 1088,
   secondary_imgsz: 640,
   ensemble_weights: [1, 1],
   wbf_iou_thr: 0.55,
   nms_iou: 0.45,
   opt_conf_thr: 0.1821,
-  val_accuracy_score: 48.54,
-  map50: 57.88,
-  map50_95: 25.11,
-  precision: 63.41,
-  recall: 54.02,
-  main_wall_ms: 41.4,
-  ensemble_ms: 60.3,
+  val_accuracy_score: 49.39,
+  map50: 59.1,
+  map50_95: 26.08,
+  precision: 64.6,
+  recall: 53.62,
+  main_wall_ms: 41.5,
+  ensemble_ms: 60.7,
   test_images_count: 4200,
-  test_detections_count: 87975,
-  test_none_count: 206,
+  test_detections_count: 101761,
+  test_none_count: 163,
 };
-
-// ── State ────────────────────────────────────────────────────────────────────
-let useLive = true;
-let selectedModelMode: ModelInferenceMode = "ensemble";
-
-export const isLiveMode = () => useLive;
-export const setLiveMode = (v: boolean) => { useLive = v; };
-
-export const getModelMode = () => selectedModelMode;
-export const setModelMode = (m: ModelInferenceMode) => { selectedModelMode = m; };
 
 const PRIMARY_ENDPOINT =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
   "http://localhost:8000";
 const PROXY_ENDPOINT = "/api";
+const REQUEST_TIMEOUT_MS = 120_000;
 
-// ── Mock data generator ──────────────────────────────────────────────────────
-const CODES: DamageCode[] = ["D00", "D10", "D20", "D40"];
-function rand(min: number, max: number) { return Math.random() * (max - min) + min; }
-
-function mockDetections(seed: number): Detection[] {
-  const rng = (n: number) => Math.abs(Math.sin(seed * 9301 + n * 49297 + 233995)) % 1;
-  const count = Math.floor(rng(0) * 8) + 3;
-  return Array.from({ length: count }, (_, i) => {
-    const x1 = rng(i * 4 + 1) * 0.72;
-    const y1 = rng(i * 4 + 2) * 0.72;
-    return {
-      code: CODES[Math.floor(rng(i * 4 + 3) * 4)] as DamageCode,
-      confidence: rng(i * 4 + 4) * 0.88 + 0.08,
-      x1,
-      y1,
-      x2: Math.min(1.0, x1 + rng(i * 4 + 5) * 0.22 + 0.06),
-      y2: Math.min(1.0, y1 + rng(i * 4 + 6) * 0.18 + 0.05),
-    };
-  });
+function getErrorMessage(detail: unknown, status: number) {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (detail && typeof detail === "object" && "detail" in detail) {
+    const message = (detail as { detail?: unknown }).detail;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return `Model API request failed with status ${status}.`;
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
 export async function runInference(
   file: File | Blob,
-  mode: ModelInferenceMode = selectedModelMode,
-  conf: number = 0.001
+  mode: ModelInferenceMode = "ensemble",
+  conf = 0.001,
 ): Promise<InferenceResult> {
-  const t0 = performance.now();
   const fileName = file instanceof File ? file.name : "frame.jpg";
+  const endpoints = [
+    `${PRIMARY_ENDPOINT}/predict?mode=${mode}&conf=${conf}`,
+    `${PROXY_ENDPOINT}/predict?mode=${mode}&conf=${conf}`,
+  ];
+  let lastNetworkError: unknown;
 
-  if (useLive) {
+  for (const endpoint of endpoints) {
     const form = new FormData();
     form.append("file", file, fileName);
-
-    const endpoints = [
-      `${PRIMARY_ENDPOINT}/predict?mode=${mode}&conf=${conf}`,
-      `${PROXY_ENDPOINT}/predict?mode=${mode}&conf=${conf}`,
-    ];
-
-    for (const ep of endpoints) {
-      try {
-        const res = await fetch(ep, {
-          method: "POST",
-          body: form,
-          signal: AbortSignal.timeout(15000),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          return {
-            detections: data.detections,
-            latencyMs: data.latency_ms ?? (performance.now() - t0),
-            imageWidth: data.width ?? 1280,
-            imageHeight: data.height ?? 720,
-            modelMode: data.model_mode,
-            device: data.device,
-            modelsUsed: data.models_used,
-            isMock: false,
-          };
-        }
-      } catch {
-        // try next endpoint or fallback
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (response.status === 502 || response.status === 504) {
+        lastNetworkError = new Error(`Backend proxy returned ${response.status}`);
+        continue;
       }
+      if (!response.ok) {
+        let detail: unknown;
+        try {
+          detail = await response.json();
+        } catch {
+          detail = undefined;
+        }
+        throw new Error(getErrorMessage(detail, response.status));
+      }
+
+      const data = await response.json();
+      return {
+        detections: data.detections,
+        latencyMs: data.latency_ms,
+        imageWidth: data.width,
+        imageHeight: data.height,
+        modelMode: data.model_mode,
+        device: data.device,
+        modelsUsed: data.models_used,
+      };
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      lastNetworkError = error;
     }
   }
 
-  // Fallback to high-fidelity mock if backend is not currently running
-  const simDelay = mode === "ensemble" ? rand(45, 58) : rand(28, 38);
-  await new Promise((r) => setTimeout(r, simDelay));
-  const seed = (file instanceof File ? (file.size ^ (file.lastModified & 0xffff)) : (file.size ^ Math.floor(Math.random() * 10000))) || Math.floor(Math.random() * 10000);
-  const latencyMs = performance.now() - t0;
-
-  return {
-    detections: mockDetections(seed),
-    latencyMs,
-    imageWidth: 1280,
-    imageHeight: 720,
-    modelMode: mode === "ensemble" ? "ensemble_wbf (simulated)" : `${mode} (simulated)`,
-    device: "cpu",
-    modelsUsed: mode === "ensemble" ? ["yolo26s(1024@1088px)", "yolo26s(640)"] : [mode],
-    isMock: true,
-  };
+  const reason = lastNetworkError instanceof Error ? ` ${lastNetworkError.message}` : "";
+  throw new Error(`Could not connect to the PAVEXA model API. Start the FastAPI service on port 8000 and try again.${reason}`);
 }
 
-export async function checkApiHealth(): Promise<"live" | "mock"> {
-  if (!useLive) return "mock";
-  try {
-    const res = await fetch(`${PRIMARY_ENDPOINT}/health`, { signal: AbortSignal.timeout(1500) });
-    if (res.ok) return "live";
-  } catch {
+export async function checkApiHealth(): Promise<"live" | "offline"> {
+  for (const endpoint of [`${PRIMARY_ENDPOINT}/health`, `${PROXY_ENDPOINT}/health`]) {
     try {
-      const resProxy = await fetch(`${PROXY_ENDPOINT}/health`, { signal: AbortSignal.timeout(1500) });
-      if (resProxy.ok) return "live";
+      const response = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
+      if (response.ok) return "live";
     } catch {
-      return "mock";
+      // Try the Vite proxy after the configured backend URL.
     }
   }
-  return "mock";
+  return "offline";
 }
 
 export async function fetchModelInfo(): Promise<ModelBenchmarkInfo> {
   try {
-    const res = await fetch(`${PRIMARY_ENDPOINT}/model-info`, { signal: AbortSignal.timeout(2000) });
-    if (res.ok) return await res.json();
+    const response = await fetch(`${PRIMARY_ENDPOINT}/model-info`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (response.ok) return await response.json();
   } catch {
-    // fallback to static benchmark constants
+    // The local repository metrics remain available when the API is offline.
   }
   return BENCHMARK_METRICS;
 }
+
+export type { DamageCode };
