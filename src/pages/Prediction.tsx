@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import InspectionReportModal from "../components/InspectionReportModal";
+import RobustnessLab from "../components/RobustnessLab";
 import EvidenceImage from "../components/EvidenceImage";
 import { BarList, ChartCard, DonutChart, Histogram, RhiGauge } from "../components/charts";
 import { runInference, type InferenceResult, type ModelInferenceMode } from "../lib/api";
@@ -85,6 +86,7 @@ export default function Prediction() {
   const [items, setItems] = useState<PredictionItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [batchMode, setBatchMode] = useState(false);
+  const [robustnessMode, setRobustnessMode] = useState(false);
   const [mode, setMode] = useState<ModelInferenceMode>("ensemble");
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
   const [viewMode, setViewMode] = useState<ViewMode>("comparison");
@@ -262,7 +264,7 @@ export default function Prediction() {
         title="Prediction testing"
         description="Run the configured YOLO26s model on road images and inspect each returned box"
         actions={
-          activeResult && (
+          activeResult && !robustnessMode && (
             <button type="button" onClick={() => void openReport()} className="btn btn-ghost">
               <FileText size={15} aria-hidden /> Build report
             </button>
@@ -286,14 +288,14 @@ export default function Prediction() {
           </select>
           <p className="mt-2 text-xs text-muted">{modeDescription}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-md border border-line bg-canvas p-1" role="tablist" aria-label="Prediction input type">
+        <div className="flex flex-wrap items-center gap-1 rounded-md border border-line bg-canvas p-1" role="tablist" aria-label="Prediction input type">
           <button
             type="button"
             role="tab"
-            aria-selected={!batchMode}
+            aria-selected={!batchMode && !robustnessMode}
             disabled={busy}
-            onClick={() => setBatchMode(false)}
-            className={`h-9 rounded px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${!batchMode ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+            onClick={() => { setBatchMode(false); setRobustnessMode(false); }}
+            className={`h-9 rounded px-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${!batchMode && !robustnessMode ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
           >
             Single image
           </button>
@@ -302,10 +304,20 @@ export default function Prediction() {
             role="tab"
             aria-selected={batchMode}
             disabled={busy}
-            onClick={() => setBatchMode(true)}
-            className={`h-9 rounded px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${batchMode ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+            onClick={() => { setBatchMode(true); setRobustnessMode(false); }}
+            className={`h-9 rounded px-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${batchMode ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
           >
             Batch images
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={robustnessMode}
+            disabled={busy}
+            onClick={() => { setBatchMode(false); setRobustnessMode(true); }}
+            className={`h-9 rounded px-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${robustnessMode ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+          >
+            Robustness lab
           </button>
         </div>
       </section>
@@ -322,6 +334,13 @@ export default function Prediction() {
               onDrop={onDrop}
               onBrowse={() => fileInputRef.current?.click()}
             />
+          )}
+
+          {robustnessMode && !activeItem && (
+            <div className="rounded-lg border border-line bg-canvas p-4 text-xs leading-5 text-muted">
+              <p className="font-medium text-ink">Choose an image to start</p>
+              <p className="mt-1">The lab will compare a clean-image baseline with each selected robustness condition.</p>
+            </div>
           )}
 
           {batchMode && (
@@ -404,10 +423,12 @@ export default function Prediction() {
                   <button type="button" className="btn btn-ghost h-9 px-3 text-xs" disabled={busy} onClick={() => removeItem(activeItem)}>
                     Remove
                   </button>
-                  <button type="button" className="btn btn-primary h-9 px-3 text-xs" disabled={busy} onClick={() => void runSingle()}>
-                    {busy ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Play size={14} aria-hidden />}
-                    {busy ? "Running" : activeItem.status === "done" ? "Run again" : "Run prediction"}
-                  </button>
+                  {!robustnessMode && (
+                    <button type="button" className="btn btn-primary h-9 px-3 text-xs" disabled={busy} onClick={() => void runSingle()}>
+                      {busy ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Play size={14} aria-hidden />}
+                      {busy ? "Running" : activeItem.status === "done" ? "Run again" : "Run prediction"}
+                    </button>
+                  )}
                 </div>
               </div>
               {activeItem.status === "error" && (
@@ -418,7 +439,7 @@ export default function Prediction() {
             </div>
           )}
 
-          {activeResult && activeItem && (
+          {!robustnessMode && activeResult && activeItem && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-line bg-surface p-4">
                 <div className="min-w-[220px] flex-1">
@@ -524,9 +545,21 @@ export default function Prediction() {
             </div>
           )}
 
+          {robustnessMode && activeItem && (
+            <RobustnessLab
+              key={activeItem.id}
+              file={activeItem.file}
+              sourceUrl={activeItem.previewUrl}
+              mode={mode}
+              threshold={threshold}
+              busy={busy}
+              onBusyChange={setBusy}
+            />
+          )}
+
         </section>
 
-        <aside className="grid gap-4 sm:grid-cols-2">
+        {!robustnessMode && <aside className="grid gap-4 sm:grid-cols-2">
           {activeResult ? (
             <>
               <ChartCard
@@ -561,6 +594,7 @@ export default function Prediction() {
               <ChartCard
                 title="Confidence distribution"
                 caption="All raw candidates; the vertical marker is the display filter"
+                className="self-start"
               >
                 <Histogram
                   values={activeResult.detections.map((detection) => detection.confidence)}
@@ -670,7 +704,7 @@ export default function Prediction() {
               </ol>
             </section>
           )}
-        </aside>
+        </aside>}
       </div>
 
       {formError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">{formError}</p>}
