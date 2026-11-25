@@ -77,10 +77,10 @@ const damageClasses: DamageCardProps[] = [
 ];
 
 const scoreRuns = [
-  { name: "1088 px detector", score: 45.9, latency: "41.5 ms" },
-  { name: "1088 px with TTA", score: 47.95, latency: "93.7 ms" },
-  { name: "1088 + 640 px, WBF", score: 48.54, latency: "60.7 ms" },
-  { name: "Final: TTA + ensemble", score: 49.39, latency: "~110 ms" },
+  { name: "640 px detector", score: 44.5 },
+  { name: "1024 px detector", score: 46.19 },
+  { name: "1088 px + TTA", score: 47.95 },
+  { name: "1088 × 640 ensemble", score: 49.39 },
 ];
 
 function ScrollProgress() {
@@ -121,7 +121,7 @@ function ScoreBar({ pct, highlight, delay }: { pct: number; highlight: boolean; 
 function SectionTitle({ eyebrow, title, children }: { eyebrow: string; title: string; children?: ReactNode }) {
   return (
     <Reveal className="mb-8 max-w-3xl">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted">{eyebrow}</p>
+      <p className="text-[12px] font-medium uppercase tracking-wider text-muted">{eyebrow}</p>
       <h2 className="mt-2 text-3xl text-ink sm:text-4xl">{title}</h2>
       {children && <p className="mt-3 text-sm leading-6 text-muted">{children}</p>}
     </Reveal>
@@ -157,7 +157,7 @@ export default function Dashboard() {
       <section className="grid overflow-hidden rounded-2xl border border-line bg-surface/80 backdrop-blur-sm lg:grid-cols-[1.05fr_0.95fr]">
         <div className="flex flex-col justify-center p-5 sm:p-8 lg:p-10">
           <Reveal>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">DataSprint 2.0 · RDD2020</p>
+            <p className="text-[12px] font-medium uppercase tracking-wider text-muted">DataSprint 2.0 · RDD2020</p>
           </Reveal>
           <Reveal delay={100}>
             <h1 className="mt-3 max-w-xl text-3xl leading-tight text-ink sm:text-4xl lg:text-5xl">
@@ -205,7 +205,7 @@ export default function Dashboard() {
         <div className="relative min-h-52 overflow-hidden bg-[#222a2b] lg:min-h-0">
           <img
             ref={heroImage}
-            src="/hero-road.jpg"
+            src="public/hero-road.jpg"
             alt="Road image from the bundled road-damage sample set"
             className="absolute inset-0 h-full w-full object-cover will-change-transform"
             style={{ transform: "scale(1.12)" }}
@@ -215,7 +215,7 @@ export default function Dashboard() {
               <p className="text-sm font-medium">Road image sample</p>
               <p className="mt-1 text-xs text-white/75">A bundled example frame · not a live prediction</p>
             </div>
-            <span className="rounded border border-white/35 px-2 py-1 font-mono text-[11px]">RDD2020</span>
+            <span className="rounded border border-white/35 px-2 py-1 font-mono text-[12px]">RDD2020</span>
           </div>
         </div>
       </section>
@@ -325,8 +325,7 @@ export default function Dashboard() {
       <section className="grid gap-10 xl:grid-cols-[1.1fr_0.9fr]">
         <div>
           <SectionTitle eyebrow="Ablation results" title="Why these settings were selected">
-            Local accuracy scores from the same validation scorer. Latency is measured unless
-            marked approximate in the source report.
+            Accuracy scores from the project’s local validation scorer.
           </SectionTitle>
           <Reveal>
             <div className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -335,7 +334,7 @@ export default function Dashboard() {
                   <div className="flex items-baseline justify-between gap-4">
                     <p className="text-sm font-medium text-ink">{run.name}</p>
                     <p className="shrink-0 font-mono text-xs tabular-nums text-muted">
-                      {run.score.toFixed(2)}% · {run.latency}
+                      {run.score.toFixed(2)}% accuracy
                     </p>
                   </div>
                   <ScoreBar pct={(run.score / 50) * 100} highlight={index === scoreRuns.length - 1} delay={index * 120} />
@@ -344,8 +343,7 @@ export default function Dashboard() {
             </div>
           </Reveal>
           <p className="mt-3 text-xs leading-5 text-muted">
-            The final 49.39% result uses 1088 px + TTA + the 640 px model. The ~110 ms latency is
-            an estimate in the source report, not a separately measured final-run benchmark.
+            The ensemble result combines the 1088 px detector with test-time augmentation and the 640 px detector.
           </p>
         </div>
 
